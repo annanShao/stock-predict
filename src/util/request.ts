@@ -1,3 +1,4 @@
+import { notification } from "antd";
 import axios from "axios";
 
 const axiosInstance = axios.create({
@@ -53,7 +54,55 @@ const createRequest = (
   };
 };
 
+addCommonInterceptors();
 const request = createRequest(axiosInstance);
+
+interface AnyObj {
+  [x: string]: any;
+}
+
+function addCommonInterceptors(instance = axiosInstance) {
+  instance.interceptors.response.use(
+    (res: any) => {
+      if (res?.data) {
+        let resData = res.data;
+        if (typeof resData === 'string') {
+          resData = JSON.parse(resData);
+        }
+
+        if (
+          resData.code === 0 ||
+          resData.error_code === 0 ||
+          resData.schemaStatus === 'ok' ||
+          `${resData.status}`.toLowerCase() === 'success'
+        ) {
+          return res.config.responseType === 'text' ? res.data : resData;
+        }
+
+        if (res.config.noVerify) {
+          return resData;
+        }
+
+        let content = '网络出错了，请重试'
+        if (typeof resData.message === 'string') {
+          content = resData.message;
+        } else if (typeof resData.message === 'object') {
+          content = JSON.stringify(resData.message);
+        }
+
+        if (!res.config || !res.config.hideError) {
+          notification.error({
+            message: '出错了',
+            description: content,
+          });
+        }
+        return resData;
+      }
+      return {};
+    },
+    (error) => Promise.reject(error),
+  );
+}
 
 function _2CamelCase(obj: any): any {
   let target: any;
